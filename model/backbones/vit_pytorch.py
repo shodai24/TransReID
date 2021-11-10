@@ -29,7 +29,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch._six import container_abcs
 
-from model.backbones.swin_transformer import SwinTransformer
+from model.backbones.swin_transformer import BasicLayer, PatchMerging, SwinTransformer
 
 
 # From PyTorch internals
@@ -295,7 +295,8 @@ class TransReID(nn.Module):
     """
     def __init__(self, img_size=224, patch_size=16, stride_size=16, in_chans=3, num_classes=1000, embed_dim=768, depth=12,
                  num_heads=12, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0., camera=0, view=0,
-                 drop_path_rate=0., hybrid_backbone=None, norm_layer=nn.LayerNorm, local_feature=False, sie_xishu =1.0):
+                 drop_path_rate=0., hybrid_backbone=None, norm_layer=nn.LayerNorm, local_feature=False, sie_xishu =1.0,
+                 swin=False, swin_depths=[2,2,6,2], swin_num_heads=[4, 8, 16, 32], swin_drop_path_rate=0.5, swin_model=None):
         super().__init__()
         self.num_classes = num_classes
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
@@ -315,6 +316,11 @@ class TransReID(nn.Module):
         self.cam_num = camera
         self.view_num = view
         self.sie_xishu = sie_xishu
+        self.swin = swin
+        self.swin_depths = swin_depths
+        self.swin_model = swin_model
+        self.swin_drop_path_rate = swin_drop_path_rate
+        self.swin_num_heads = swin_num_heads
         # Initialize SIE Embedding
         if camera > 1 and view > 1:
             self.sie_embed = nn.Parameter(torch.zeros(camera * view, 1, embed_dim))
@@ -339,13 +345,37 @@ class TransReID(nn.Module):
         self.pos_drop = nn.Dropout(p=drop_rate)
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
 
-        self.blocks = nn.ModuleList([
-            Block(
-                dim=embed_dim, num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale,
-                drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer)
+        # TODO Make sure parameters for BasicLayer() are passed correctly from parent function (or cfg)
+        #! Temporary solution: hard coded
+        if self.swin:
+            m = self.swin_model
+            swin_dpr = [x.item() for x in torch.linspace(0, swin_drop_path_rate, sum(swin_depths))]
+            self.swin_num_heads = [4, 8, 16, 32]
+            self.blocks = nn.ModuleList([
+                BasicLayer(
+                    dim=int(128 * 2 ** i), #!
+                    input_resolution=(m.patches_resolution[0] // (2 ** i),
+                                    m.patches_resolution[1] // (2 ** i)),
+                    depth=self.swin_depths[i], #!
+                    num_heads=self.swin_num_heads[i], #!
+                    window_size=7, #!
+                    mlp_ratio=4, #!
+                    qkv_bias=True, qk_scale=None, #!
+                    drop=0, attn_drop=0, #!
+                    drop_path=swin_dpr[sum(self.swin_depths[:i]):sum(self.swin_depths[:i + 1])],
+                    norm_layer=norm_layer,
+                    downsample=PatchMerging if (i < len(self.swin_depths) - 1) else None,
+                    use_checkpoint=False #!
+                )
+                for i in range(len(self.swin_depths))])
+        else:
+            self.blocks = nn.ModuleList([
+                Block(
+                    dim=embed_dim, num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale,
+                    drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer)
             for i in range(depth)])
 
-        self.norm = norm_layer(embed_dim)
+            self.norm = norm_layer(embed_dim)
 
         # Classifier head
         self.fc = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
@@ -477,12 +507,15 @@ def deit_small_patch16_224_TransReID(img_size=(256, 128), stride_size=16, drop_p
 
     return model
 
-def swin_base_patch4_window7_224_TransReID(img_size=(256, 128), stride_size=16, drop_rate=0.0, attn_drop_rate=0.0, drop_path_rate=0.1, camera=0, view=0,local_feature=False,sie_xishu=1.5, **kwargs):
-    swin_model = SwinTransformer()
+def swin_base_patch4_window7_224_TransReID(img_size=(256, 128), stride_size=16, drop_rate=0.0, attn_drop_rate=0.0, drop_path_rate=0.1, camera=0, view=0,local_feature=False,sie_xishu=1.5,
+swin=True, swin_embed_dim=128, swin_depths=[2,2,18,2], swin_num_heads=[4,8,16,32], swin_window_size=7, swin_drop_path_rate=0.5, **kwargs):
+    swin_model = SwinTransformer(
+        img_size=224, patch_size=4, embed_dim=swin_embed_dim, depths=swin_depths, num_heads=swin_num_heads, window_size=swin_window_size, drop_path_rate=swin_drop_path_rate)
     model = TransReID(
         img_size=img_size, patch_size=16, stride_size=stride_size, embed_dim=384, depth=12, num_heads=6, mlp_ratio=4, qkv_bias=True,
         drop_path_rate=drop_path_rate, drop_rate=drop_rate, attn_drop_rate=attn_drop_rate, camera=camera, view=view, sie_xishu=sie_xishu, local_feature=local_feature,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), swin=True, swin_depths=swin_depths, swin_num_heads=swin_num_heads,
+        swin_drop_path_rate=swin_drop_path_rate, swin_model=swin_model, **kwargs)
     model.swin_model = swin_model
     return model
 

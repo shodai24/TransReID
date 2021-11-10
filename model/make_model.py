@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 from .backbones.resnet import ResNet, Bottleneck
 import copy
-from .backbones.vit_pytorch import vit_base_patch16_224_TransReID, vit_small_patch16_224_TransReID, deit_small_patch16_224_TransReID
-from .backbones.swin_transformer import swin_base_patch4_window7_224_TransReID
+from .backbones.vit_pytorch import vit_base_patch16_224_TransReID, vit_small_patch16_224_TransReID, \
+    deit_small_patch16_224_TransReID, swin_base_patch4_window7_224_TransReID
 from loss.metric_learning import Arcface, Cosface, AMSoftmax, CircleLoss
 
 def shuffle_unit(features, shift, group, begin=1):
@@ -235,14 +235,26 @@ class build_transformer_local(nn.Module):
         else:
             view_num = 0
 
-        self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE, local_feature=cfg.MODEL.JPM, camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH)
+        if cfg.MODEL.IS_SWIN:
+            self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE, local_feature=cfg.MODEL.JPM, camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH,
+            swin_embed_dim=128, swin_depths=[2,2,18,2], swin_num_heads=[4,8,16,32], swin_window_size=7, swin_drop_path_rate=0.5)
+            # TODO Pass arguments form CFG file into function
+        else:
+            self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE, local_feature=cfg.MODEL.JPM, camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH)
 
         if pretrain_choice == 'imagenet':
-            self.base.load_param(model_path)
+            if self.base.swin_model is not None:
+                self.base.swin_model.load_param(model_path)
+            else:
+                self.base.load_param(model_path)
             print('Loading pretrained ImageNet model......from {}'.format(model_path))
 
-        block = self.base.blocks[-1]
-        layer_norm = self.base.norm
+        if self.base.swin_model is not None:
+            block = self.base.swin_model.layers[-1] # swin
+            layer_norm = self.base.swin_model.norm
+        else: 
+            block = self.base.blocks[-1]
+            layer_norm = self.base.norm
         self.b1 = nn.Sequential(
             copy.deepcopy(block),
             copy.deepcopy(layer_norm)

@@ -68,6 +68,15 @@ _C.MODEL.SIE_COE = 3.0
 _C.MODEL.SIE_CAMERA = False
 _C.MODEL.SIE_VIEW = False
 
+# Swin Parameter
+_C.MODEL.IS_SWIN = False
+_C.MODEL.SWIN_EMBED_DIM = 128
+_C.MODEL.SWIN_DEPTHS = [2, 2, 18, 2]
+_C.MODEL.SWIN_NUM_HEADS = [4, 8, 16, 32]
+_C.MODEL.SWIN_WINDOW_SIZE = 7
+_C.MODEL.SWIN_DROP_PATH_RATE = 0.5
+
+
 # -----------------------------------------------------------------------------
 # INPUT
 # -----------------------------------------------------------------------------

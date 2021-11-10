@@ -583,3 +583,18 @@ class SwinTransformer(nn.Module):
         flops += self.num_features * self.patches_resolution[0] * self.patches_resolution[1] // (2 ** self.num_layers)
         flops += self.num_features * self.num_classes
         return flops
+    
+    def load_param(self, model_path):
+        # load parameters
+        param_dict = torch.load(model_path, map_location='cpu')
+        if 'model' in param_dict:
+            param_dict = param_dict['model']
+        if 'state_dict' in param_dict:
+            param_dict = param_dict['state_dict']
+        for k, v in param_dict.items():
+            try:
+                self.state_dict()[k].copy_(v)
+            except:
+                print('========================ERROR============================')
+                print('shape do not match in k :{}: paramd_dict{} vs self.stat_dict(){}'.format(k, v.shape, self.state_dict()[k].shape))
+        pass
