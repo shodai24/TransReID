@@ -312,7 +312,7 @@ class TransReID(nn.Module):
         num_patches = self.patch_embed.num_patches
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-        self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, embed_dim))
+        self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, embed_dim))
         self.cam_num = camera
         self.view_num = view
         self.sie_xishu = sie_xishu
@@ -375,7 +375,7 @@ class TransReID(nn.Module):
                     drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer)
             for i in range(depth)])
 
-            self.norm = norm_layer(embed_dim)
+        self.norm = norm_layer(1024) # embed_dim = 1024 in last swin layer
 
         # Classifier head
         self.fc = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
@@ -408,8 +408,8 @@ class TransReID(nn.Module):
         B = x.shape[0]
         x = self.patch_embed(x)
 
-        cls_tokens = self.cls_token.expand(B, -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
-        x = torch.cat((cls_tokens, x), dim=1)
+        # cls_tokens = self.cls_token.expand(B, -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
+        # x = torch.cat((cls_tokens, x), dim=1)
 
         if self.cam_num > 0 and self.view_num > 0:
             x = x + self.pos_embed + self.sie_xishu * self.sie_embed[camera_id * self.view_num + view_id]
@@ -507,12 +507,12 @@ def deit_small_patch16_224_TransReID(img_size=(256, 128), stride_size=16, drop_p
 
     return model
 
-def swin_base_patch4_window7_224_TransReID(img_size=(256, 128), stride_size=16, drop_rate=0.0, attn_drop_rate=0.0, drop_path_rate=0.1, camera=0, view=0,local_feature=False,sie_xishu=1.5,
+def swin_base_patch4_window7_224_TransReID(img_size=(224, 224), stride_size=4, drop_rate=0.0, attn_drop_rate=0.0, drop_path_rate=0.1, camera=0, view=0,local_feature=False,sie_xishu=1.5,
 swin=True, swin_embed_dim=128, swin_depths=[2,2,18,2], swin_num_heads=[4,8,16,32], swin_window_size=7, swin_drop_path_rate=0.5, **kwargs):
     swin_model = SwinTransformer(
         img_size=224, patch_size=4, embed_dim=swin_embed_dim, depths=swin_depths, num_heads=swin_num_heads, window_size=swin_window_size, drop_path_rate=swin_drop_path_rate)
     model = TransReID(
-        img_size=img_size, patch_size=16, stride_size=stride_size, embed_dim=384, depth=12, num_heads=6, mlp_ratio=4, qkv_bias=True,
+        img_size=img_size, patch_size=4, stride_size=stride_size, embed_dim=128, depth=12, num_heads=6, mlp_ratio=4, qkv_bias=True,
         drop_path_rate=drop_path_rate, drop_rate=drop_rate, attn_drop_rate=attn_drop_rate, camera=camera, view=view, sie_xishu=sie_xishu, local_feature=local_feature,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), swin=True, swin_depths=swin_depths, swin_num_heads=swin_num_heads,
         swin_drop_path_rate=swin_drop_path_rate, swin_model=swin_model, **kwargs)

@@ -142,14 +142,23 @@ class build_transformer(nn.Module):
         else:
             view_num = 0
 
-        self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE,
-                                                        camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH,
-                                                        drop_rate= cfg.MODEL.DROP_OUT,
-                                                        attn_drop_rate=cfg.MODEL.ATT_DROP_RATE)
+        if cfg.MODEL.IS_SWIN:
+            self.in_planes = 128
+            self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE, camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH,
+            swin_embed_dim=128, swin_depths=[2,2,18,2], swin_num_heads=[4,8,16,32], swin_window_size=7, swin_drop_path_rate=0.5)
+            # TODO Pass arguments form CFG file into function
+        else:
+            self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE,
+                                                            camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH,
+                                                            drop_rate= cfg.MODEL.DROP_OUT,
+                                                            attn_drop_rate=cfg.MODEL.ATT_DROP_RATE)
         if cfg.MODEL.TRANSFORMER_TYPE == 'deit_small_patch16_224_TransReID':
             self.in_planes = 384
         if pretrain_choice == 'imagenet':
-            self.base.load_param(model_path)
+            if self.base.swin_model is not None:
+                self.base.swin_model.load_param(model_path)
+            else:
+                self.base.load_param(model_path)
             print('Loading pretrained ImageNet model......from {}'.format(model_path))
 
         self.gap = nn.AdaptiveAvgPool2d(1)
@@ -173,10 +182,10 @@ class build_transformer(nn.Module):
             self.classifier = CircleLoss(self.in_planes, self.num_classes,
                                         s=cfg.SOLVER.COSINE_SCALE, m=cfg.SOLVER.COSINE_MARGIN)
         else:
-            self.classifier = nn.Linear(self.in_planes, self.num_classes, bias=False)
+            self.classifier = nn.Linear(1024, self.num_classes, bias=False) #! self.in_planes = 1024
             self.classifier.apply(weights_init_classifier)
 
-        self.bottleneck = nn.BatchNorm1d(self.in_planes)
+        self.bottleneck = nn.BatchNorm1d(1024) #! self.in_planes = 1024
         self.bottleneck.bias.requires_grad_(False)
         self.bottleneck.apply(weights_init_kaiming)
 

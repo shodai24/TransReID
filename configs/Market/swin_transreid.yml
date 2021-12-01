@@ -8,11 +8,11 @@ MODEL:
   NO_MARGIN: True
   DEVICE_ID: ('5')
   TRANSFORMER_TYPE: 'swin_base_patch4_window7_224_TransReID'
-  STRIDE_SIZE: [16, 16]
+  STRIDE_SIZE: [4, 4]
   SIE_CAMERA: True
   SIE_COE: 3.0
-  JPM: True
-  RE_ARRANGE: True
+  # JPM: True
+  # RE_ARRANGE: True
   IS_SWIN: True
   SWIN_EMBED_DIM: 128
   SWIN_DEPTHS: [2, 2, 18, 2]
@@ -21,8 +21,8 @@ MODEL:
   SWIN_DROP_PATH_RATE: 0.5
 
 INPUT:
-  SIZE_TRAIN: [256, 128]
-  SIZE_TEST: [256, 128]
+  SIZE_TRAIN: [224, 224]
+  SIZE_TEST: [224, 224]
   PROB: 0.5 # random horizontal flip
   RE_PROB: 0.5 # random erasing
   PADDING: 10
@@ -42,7 +42,7 @@ SOLVER:
   OPTIMIZER_NAME: 'SGD'
   MAX_EPOCHS: 120
   BASE_LR: 0.008
-  IMS_PER_BATCH: 64
+  IMS_PER_BATCH: 16
   WARMUP_METHOD: 'linear'
   LARGE_FC_LR: False
   CHECKPOINT_PERIOD: 120
