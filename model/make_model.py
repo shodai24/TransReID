@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+
+from .backbones.swin_transformer import SwinTransformer
 from .backbones.resnet import ResNet, Bottleneck
 import copy
 from .backbones.vit_pytorch import vit_base_patch16_224_TransReID, vit_small_patch16_224_TransReID, \
@@ -65,6 +67,18 @@ class Backbone(nn.Module):
                                block=Bottleneck,
                                layers=[3, 4, 6, 3])
             print('using resnet50 as a backbone')
+        elif model_name == 'swin':
+            self.in_planes = 1024
+            self.base = SwinTransformer(
+                img_size=224,
+                patch_size=4,
+                embed_dim=128,
+                depths=[2, 2, 18, 2],
+                num_heads=[4, 8, 16, 32],
+                window_size=7,
+                drop_path_rate=0.5
+            )
+            print('using Swin as a backbone')
         else:
             print('unsupported backbone! but got {}'.format(model_name))
 
@@ -82,11 +96,13 @@ class Backbone(nn.Module):
         self.bottleneck.bias.requires_grad_(False)
         self.bottleneck.apply(weights_init_kaiming)
 
-    def forward(self, x, label=None):  # label is unused if self.cos_layer == 'no'
+    def forward(self, x, label=None, cam_label=None, view_label=None):  # label is unused if self.cos_layer == 'no'
         x = self.base(x)
-        global_feat = nn.functional.avg_pool2d(x, x.shape[2:4])
-        global_feat = global_feat.view(global_feat.shape[0], -1)  # flatten to (bs, 2048)
+        # global_feat = nn.functional.avg_pool2d(x, x.shape[2:4])
+        # global_feat = global_feat.view(global_feat.shape[0], -1)  # flatten to (bs, 2048)
 
+        global_feat = x
+        
         if self.neck == 'no':
             feat = global_feat
         elif self.neck == 'bnneck':
@@ -192,7 +208,8 @@ class build_transformer(nn.Module):
     def forward(self, x, label=None, cam_label= None, view_label=None):
         global_feat = self.base(x, cam_label=cam_label, view_label=view_label)
 
-        feat = self.bottleneck(global_feat)
+        # feat = self.bottleneck(global_feat)
+        feat = global_feat #! skip batch normalization
 
         if self.training:
             if self.ID_LOSS_TYPE in ('arcface', 'cosface', 'amsoftmax', 'circle'):
@@ -421,6 +438,9 @@ def make_model(cfg, num_class, camera_num, view_num):
         else:
             model = build_transformer(num_class, camera_num, view_num, cfg, __factory_T_type)
             print('===========building transformer===========')
+    elif cfg.MODEL.NAME == 'swin':
+        model = Backbone(num_class, cfg)
+        print('===========building Swin===========')
     else:
         model = Backbone(num_class, cfg)
         print('===========building ResNet===========')
