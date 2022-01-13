@@ -557,7 +557,7 @@ class SwinTransformer(nn.Module):
         return {'relative_position_bias_table'}
 
     def forward_features(self, x):
-        x = self.patch_embed(x)
+        # x = self.patch_embed(x) #! skiped swin patch embed - used transreid + SIE instead
         if self.ape:
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)

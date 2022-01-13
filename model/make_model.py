@@ -134,7 +134,6 @@ class Backbone(nn.Module):
             self.state_dict()[i].copy_(param_dict[i])
         print('Loading pretrained model for finetuning from {}'.format(model_path))
 
-
 class build_transformer(nn.Module):
     def __init__(self, num_classes, camera_num, view_num, cfg, factory):
         super(build_transformer, self).__init__()
@@ -159,10 +158,18 @@ class build_transformer(nn.Module):
             view_num = 0
 
         if cfg.MODEL.IS_SWIN:
-            self.in_planes = 128
-            self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE, camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH,
-            swin_embed_dim=128, swin_depths=[2,2,18,2], swin_num_heads=[4,8,16,32], swin_window_size=7, swin_drop_path_rate=0.5)
-            # TODO Pass arguments form CFG file into function
+            self.in_planes = 1024
+            self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](
+                img_size=cfg.INPUT.SIZE_TRAIN,
+                sie_xishu=cfg.MODEL.SIE_COE,
+                camera=camera_num, view=view_num,
+                stride_size=cfg.MODEL.STRIDE_SIZE,
+                drop_path_rate=cfg.MODEL.DROP_PATH,
+                swin_embed_dim=cfg.MODEL.SWIN_EMBED_DIM,
+                swin_depths=cfg.MODEL.SWIN_DEPTHS,
+                swin_num_heads=cfg.MODEL.SWIN_NUM_HEADS,
+                swin_window_size=cfg.MODEL.SWIN_WINDOW_SIZE,
+                swin_drop_path_rate=cfg.MODEL.SWIN_DROP_PATH_RATE)
         else:
             self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE,
                                                             camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH,
@@ -198,18 +205,18 @@ class build_transformer(nn.Module):
             self.classifier = CircleLoss(self.in_planes, self.num_classes,
                                         s=cfg.SOLVER.COSINE_SCALE, m=cfg.SOLVER.COSINE_MARGIN)
         else:
-            self.classifier = nn.Linear(1024, self.num_classes, bias=False) #! self.in_planes = 1024
+            self.classifier = nn.Linear(self.in_planes, self.num_classes, bias=False)
             self.classifier.apply(weights_init_classifier)
 
-        self.bottleneck = nn.BatchNorm1d(1024) #! self.in_planes = 1024
+        self.bottleneck = nn.BatchNorm1d(self.in_planes)
         self.bottleneck.bias.requires_grad_(False)
         self.bottleneck.apply(weights_init_kaiming)
 
     def forward(self, x, label=None, cam_label= None, view_label=None):
         global_feat = self.base(x, cam_label=cam_label, view_label=view_label)
 
-        # feat = self.bottleneck(global_feat)
-        feat = global_feat #! skip batch normalization
+        feat = self.bottleneck(global_feat) #? skip batch norm?
+        feat = global_feat
 
         if self.training:
             if self.ID_LOSS_TYPE in ('arcface', 'cosface', 'amsoftmax', 'circle'):
@@ -439,8 +446,12 @@ def make_model(cfg, num_class, camera_num, view_num):
             model = build_transformer(num_class, camera_num, view_num, cfg, __factory_T_type)
             print('===========building transformer===========')
     elif cfg.MODEL.NAME == 'swin':
-        model = Backbone(num_class, cfg)
-        print('===========building Swin===========')
+        if cfg.MODEL.SIE_CAMERA:
+            model = build_transformer(num_class, camera_num, view_num, cfg, __factory_T_type)
+            print('===========building transformer===========')
+        else:
+            model = Backbone(num_class, cfg)
+            print('===========building Swin===========')
     else:
         model = Backbone(num_class, cfg)
         print('===========building ResNet===========')

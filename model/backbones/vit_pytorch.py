@@ -352,22 +352,16 @@ class TransReID(nn.Module):
             swin_dpr = [x.item() for x in torch.linspace(0, swin_drop_path_rate, sum(swin_depths))]
             self.swin_num_heads = [4, 8, 16, 32]
             self.blocks = nn.ModuleList([
-                BasicLayer(
-                    dim=int(128 * 2 ** i), #!
-                    input_resolution=(m.patches_resolution[0] // (2 ** i),
-                                    m.patches_resolution[1] // (2 ** i)),
-                    depth=self.swin_depths[i], #!
-                    num_heads=self.swin_num_heads[i], #!
-                    window_size=7, #!
-                    mlp_ratio=4, #!
-                    qkv_bias=True, qk_scale=None, #!
-                    drop=0, attn_drop=0, #!
-                    drop_path=swin_dpr[sum(self.swin_depths[:i]):sum(self.swin_depths[:i + 1])],
-                    norm_layer=norm_layer,
-                    downsample=PatchMerging if (i < len(self.swin_depths) - 1) else None,
-                    use_checkpoint=False #!
-                )
-                for i in range(len(self.swin_depths))])
+                SwinTransformer(
+                img_size=224,
+                patch_size=4,
+                embed_dim=128,
+                depths=[2, 2, 18, 2],
+                num_heads=[4, 8, 16, 32],
+                window_size=7,
+                drop_path_rate=0.5
+            )
+            ])
         else:
             self.blocks = nn.ModuleList([
                 Block(
