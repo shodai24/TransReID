@@ -420,14 +420,20 @@ class TransReID(nn.Module):
             for blk in self.blocks[:-1]:
                 x = blk(x)
             return x
+        elif self.swin:
+            for blk in self.blocks:
+                x = blk(x)
 
+            x = self.norm(x)
+
+            return x
         else:
             for blk in self.blocks:
                 x = blk(x)
 
             x = self.norm(x)
 
-            return x[:, 0]
+            return x[:, 0] 
 
     def forward(self, x, cam_label=None, view_label=None):
         x = self.forward_features(x, cam_label, view_label)
