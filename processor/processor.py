@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from utils.meter import AverageMeter
 from utils.metrics import R1_mAP_eval
+from utils.graphs import TrainStat
 from torch.cuda import amp
 import torch.distributed as dist
 
@@ -36,6 +37,7 @@ def do_train(cfg,
 
     loss_meter = AverageMeter()
     acc_meter = AverageMeter()
+    statter = TrainStat()
 
     evaluator = R1_mAP_eval(num_query, max_rank=50, feat_norm=cfg.TEST.FEAT_NORM)
     scaler = amp.GradScaler()
@@ -81,6 +83,7 @@ def do_train(cfg,
                 logger.info("Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, Acc: {:.3f}, Base Lr: {:.2e}"
                             .format(epoch, (n_iter + 1), len(train_loader),
                                     loss_meter.avg, acc_meter.avg, scheduler._get_lr(epoch)[0]))
+                statter.add(epoch, n_iter + 1, loss_meter.avg, acc_meter.avg, scheduler._get_lr(epoch)[0])
 
         end_time = time.time()
         time_per_batch = (end_time - start_time) / (n_iter + 1)
@@ -95,9 +98,13 @@ def do_train(cfg,
                 if dist.get_rank() == 0:
                     torch.save(model.state_dict(),
                                os.path.join(cfg.OUTPUT_DIR, cfg.MODEL.NAME + '_{}.pth'.format(epoch)))
+                statter.plot()
+                statter.save(cfg.OUTPUT_DIR)
             else:
                 torch.save(model.state_dict(),
                            os.path.join(cfg.OUTPUT_DIR, cfg.MODEL.NAME + '_{}.pth'.format(epoch)))
+                statter.plot()
+                statter.save(cfg.OUTPUT_DIR)
 
         if epoch % eval_period == 0:
             if cfg.MODEL.DIST_TRAIN:
