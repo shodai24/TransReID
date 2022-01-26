@@ -9,8 +9,8 @@ MODEL:
   DEVICE_ID: ('0')
   TRANSFORMER_TYPE: 'swin_base_patch4_window7_224_TransReID'
   STRIDE_SIZE: [4, 4]
-  SIE_CAMERA: True
-  SIE_COE: 3.0
+  # SIE_CAMERA: True
+  # SIE_COE: 3.0
   # JPM: True
   # RE_ARRANGE: True
   IS_SWIN: True
@@ -56,10 +56,10 @@ TEST:
   EVAL: True
   IMS_PER_BATCH: 64
   RE_RANKING: False
-  WEIGHT: '../logs/market_swin_transreid/130122/swin_transformer_120_130122.pth'
+  WEIGHT: '../logs/market_swin_transreid/130122/swin_transformer_120_260122.pth'
   NECK_FEAT: 'before'
   FEAT_NORM: 'yes'
 
-OUTPUT_DIR: '../logs/market_swin_transreid/130122'
+OUTPUT_DIR: '../logs/market_swin_transreid/260122'
 
 
