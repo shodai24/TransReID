@@ -130,8 +130,13 @@ def do_train(cfg,
                         img = img.to(device)
                         camids = camids.to(device)
                         target_view = target_view.to(device)
-                        feat = model(img, cam_label=camids, view_label=target_view)
-                        evaluator.update((feat, vid, camid))
+                        score, feat = model(img, cam_label=camids, view_label=target_view)
+                        if isinstance(score, list):
+                            acc = (score[0].max(1)[1] == target).float().mean()
+                        else:
+                            acc = (score.max(1)[1] == target).float().mean()
+                        statter.update_valid_acc(acc)
+                        evaluator.update((feat, vid, camid))                      
                 cmc, mAP, _, _, _, _, _ = evaluator.compute()
                 logger.info("Validation Results - Epoch: {}".format(epoch))
                 logger.info("mAP: {:.1%}".format(mAP))

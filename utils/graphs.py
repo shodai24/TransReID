@@ -11,24 +11,29 @@ class TrainStat():
         self.epoch = []
         self.iter = []
         self.loss = []
-        self.acc = []
+        self.train_acc = []
+        self.valid_acc = []
         self.lr = []
     
-    def add(self, epoch, n_iter, loss, acc, lr):
+    def add(self, epoch, n_iter, loss, train_acc, valid_acc, lr):
         self.epoch.append(epoch)
         if len(self.iter) == 0:
             self.iter.append(float(n_iter))
         else:    
             self.iter.append(float(n_iter + self.iter[-1]))
         self.loss.append(loss)
-        self.acc.append(Tensor.cpu(acc).item())
+        self.train_acc.append(Tensor.cpu(train_acc).item())
         self.lr.append(lr)
     
+    def update_valid_acc(self, valid_acc):
+        self.valid_acc.append(Tensor.cpu(valid_acc).item())
+
     def plot(self):
         self.df = pd.DataFrame({'epoch': self.epoch,
                                 'n_iter': self.iter,
                                 'loss' : self.loss,
-                                'accuracy' : self.acc,
+                                'training accuracy' : self.train_acc,
+                                'validation accuracy'
                                 'learning rate' : self.lr})
         #self.fig = px.line(
         #    x=self.iter,
