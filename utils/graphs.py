@@ -22,6 +22,7 @@ class TrainStat():
         else:    
             self.iter.append(float(n_iter + self.iter[-1]))
         self.loss.append(loss)
+        self.valid_acc.append(None)
         self.train_acc.append(Tensor.cpu(train_acc).item())
         self.lr.append(lr)
     
