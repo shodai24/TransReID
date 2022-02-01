@@ -15,7 +15,7 @@ class TrainStat():
         self.valid_acc = []
         self.lr = []
     
-    def add(self, epoch, n_iter, loss, train_acc, valid_acc, lr):
+    def add(self, epoch, n_iter, loss, train_acc, lr):
         self.epoch.append(epoch)
         if len(self.iter) == 0:
             self.iter.append(float(n_iter))
