@@ -33,7 +33,7 @@ class TrainStat():
                                 'n_iter': self.iter,
                                 'loss' : self.loss,
                                 'training accuracy' : self.train_acc,
-                                'validation accuracy'
+                                'validation accuracy': self.valid_acc,
                                 'learning rate' : self.lr})
         #self.fig = px.line(
         #    x=self.iter,
@@ -42,7 +42,7 @@ class TrainStat():
         #            'y': ['loss', 'accuracy', 'learning rate']},
         #    markers=True)
         
-        self.fig = px.line(self.df, x='n_iter', y=['loss', 'accuracy', 'learning rate'], markers=True)
+        self.fig = px.line(self.df, x='n_iter', y=['loss', 'training accuracy', 'validation accuracy', 'learning rate'], markers=True)
     
     def show(self):
         self.fig.show() 
