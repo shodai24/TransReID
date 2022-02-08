@@ -49,6 +49,7 @@ def do_train(cfg,
         evaluator.reset()
         scheduler.step(epoch)
         model.train()
+        statter.set_pad_length(epoch_length=len(train_loader), log_period=log_period)
         for n_iter, (img, vid, target_cam, target_view) in enumerate(train_loader):
             optimizer.zero_grad()
             optimizer_center.zero_grad()
@@ -98,13 +99,13 @@ def do_train(cfg,
                 if dist.get_rank() == 0:
                     torch.save(model.state_dict(),
                                os.path.join(cfg.OUTPUT_DIR, cfg.MODEL.NAME + '_{}.pth'.format(epoch)))
-                statter.plot()
-                statter.save(cfg.OUTPUT_DIR)
+                #statter.plot()
+                #statter.save(cfg.OUTPUT_DIR)
             else:
                 torch.save(model.state_dict(),
                            os.path.join(cfg.OUTPUT_DIR, cfg.MODEL.NAME + '_{}.pth'.format(epoch)))
-                statter.plot()
-                statter.save(cfg.OUTPUT_DIR)
+                #statter.plot()
+                #statter.save(cfg.OUTPUT_DIR)
 
         if epoch % eval_period == 0:
             if cfg.MODEL.DIST_TRAIN:
@@ -122,6 +123,9 @@ def do_train(cfg,
                     logger.info("mAP: {:.1%}".format(mAP))
                     for r in [1, 5, 10]:
                         logger.info("CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
+                    statter.add_valid(mAP=mAP, cmc_r1=cmc[0], cmc_r5=cmc[4], cmc_r10=cmc[9])
+                    statter.plot()
+                    statter.save(cfg.OUTPUT_DIR)
                     torch.cuda.empty_cache()
             else:
                 model.eval()
@@ -130,18 +134,16 @@ def do_train(cfg,
                         img = img.to(device)
                         camids = camids.to(device)
                         target_view = target_view.to(device)
-                        score, feat = model(img, cam_label=camids, view_label=target_view)
-                        if isinstance(score, list):
-                            acc = (score[0].max(1)[1] == target).float().mean()
-                        else:
-                            acc = (score.max(1)[1] == target).float().mean()
-                        statter.update_valid_acc(acc)
+                        feat = model(img, cam_label=camids, view_label=target_view)
                         evaluator.update((feat, vid, camid))                      
                 cmc, mAP, _, _, _, _, _ = evaluator.compute()
                 logger.info("Validation Results - Epoch: {}".format(epoch))
                 logger.info("mAP: {:.1%}".format(mAP))
                 for r in [1, 5, 10]:
                     logger.info("CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
+                statter.add_valid(mAP=mAP, cmc_r1=cmc[0], cmc_r5=cmc[4], cmc_r10=cmc[9])
+                statter.plot()
+                statter.save(cfg.OUTPUT_DIR)
                 torch.cuda.empty_cache()
 
 
