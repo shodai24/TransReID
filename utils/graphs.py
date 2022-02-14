@@ -1,6 +1,7 @@
 from typing import Any, List
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime
 import os
@@ -65,23 +66,17 @@ class TrainStat():
         #            'y': ['loss', 'accuracy', 'learning rate']},
         #    markers=True)
         
-        self.fig = px.line(
-            data_frame=self.df,
-            x='n_iter',
-            y=['loss',
-               'training accuracy',
-               'validation accuracy',
-               'learning rate',
-               'mean average precision',
-               'CMC Rank-1',
-               'CMC Rank-5',
-               'CMC Rank-10'],
-            markers=True,
-            title="Training Data",
-            labels={
-                'n_iter': 'Number of Iterations',
-                
-            })
+        #self.fig = px.line(
+        #    data_frame=self.df,
+        #    x='n_iter',
+        #    y=['loss', 'training accuracy', 'validation accuracy', 'learning rate', 'mean average precision', 'CMC Rank-1', 'CMC Rank-5','CMC Rank-10'],
+        #    markers=True,
+        #    title="Training Data")
+        cols = self.df.columns.tolist()
+        cols.remove('n_iter')
+        self.fig = go.Figure()
+        for col in cols:
+                self.fig.add_trace(go.Line(x=self.df['n_iter'], y=self.df[col]))
     
     def show(self):
         self.fig.show() 
