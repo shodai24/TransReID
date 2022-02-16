@@ -6,7 +6,8 @@ import numpy as np
 from datetime import datetime
 import os
 from torch import Tensor
-
+import parse
+import re
 
 class TrainStat():
     def __init__(self) -> None:
@@ -27,7 +28,9 @@ class TrainStat():
         else:    
             self.iter.append(float(50 + self.iter[-1]))
         self.loss.append(loss)
-        self.train_acc.append(Tensor.cpu(train_acc).item())
+        if type(train_acc) is Tensor:
+            train_acc = Tensor.cpu(train_acc).item()
+        self.train_acc.append(train_acc)
         self.lr.append(lr)
     
     def add_valid(self, mAP, cmc_r1, cmc_r5, cmc_r10):        
@@ -59,24 +62,11 @@ class TrainStat():
                                 'CMC Rank-1': self.cmc_r1,
                                 'CMC Rank-5': self.cmc_r5,
                                 'CMC Rank-10': self.cmc_r10})
-        #self.fig = px.line(
-        #    x=self.iter,
-        #    y=[self.loss, self.acc, self.lr],
-        #    labels={'x': 'N_Iterations',
-        #            'y': ['loss', 'accuracy', 'learning rate']},
-        #    markers=True)
-        
-        #self.fig = px.line(
-        #    data_frame=self.df,
-        #    x='n_iter',
-        #    y=['loss', 'training accuracy', 'validation accuracy', 'learning rate', 'mean average precision', 'CMC Rank-1', 'CMC Rank-5','CMC Rank-10'],
-        #    markers=True,
-        #    title="Training Data")
         cols = self.df.columns.tolist()
         cols.remove('n_iter')
         self.fig = go.Figure()
         for col in cols:
-                self.fig.add_trace(go.Line(x=self.df['n_iter'], y=self.df[col]))
+                self.fig.add_trace(go.Line(x=self.df['n_iter'], y=self.df[col], name=col, mode='lines+markers'))
     
     def show(self):
         self.fig.show() 
@@ -89,3 +79,41 @@ class TrainStat():
 
     def set_pad_length(self, epoch_length, log_period=50):
         self.pad_len = (epoch_length // log_period)
+    
+    def load_train_log(self, filepath):
+        # open train log
+        with open(filepath, 'r') as file:
+            no_pad_length_set = True
+            for line in file:
+                if 'LOG_PERIOD' in line:
+                    p = re.compile(r'\d+')
+                    self.log_period = int(p.findall(line).pop())
+                if 'INFO: Epoch[' in line:
+                    index = line.find('Epoch')
+                    line = line[index:]
+                    form = "Epoch[{0}] Iteration[{1}/{2}] Loss: {3}, Acc: {4}, Base Lr: {5}"
+                    epoch, iterations, max_iter, loss, acc, lr = list(map(float, parse.parse(form, line)))
+                    n_iter = ((epoch - 1) * max_iter) + iterations
+                    self.add(epoch, n_iter, loss, acc, lr)
+                    if no_pad_length_set:
+                        self.set_pad_length(int(max_iter), self.log_period)
+                if 'Validation Results' in line:
+                    p = re.compile(r'\d+\.\d+')
+                    mAP = float(p.findall(file.readline()).pop())
+                    cmc_r1 = float(p.findall(file.readline()).pop())
+                    cmc_r5 = float(p.findall(file.readline()).pop())
+                    cmc_r10 = float(p.findall(file.readline()).pop())
+
+                    if any(elem is None for elem in [mAP, cmc_r1, cmc_r5, cmc_r10]):
+                        self.epoch.pop() # remove incomplete epoch from list
+                    else:
+                        self.add_valid(mAP, cmc_r1, cmc_r5, cmc_r10)
+        # discard lines for incomplete epochs
+        max_epoch = int(max(self.epoch))
+        if len(self.epoch) != max_epoch * self.pad_len:
+            num_elements = (max_epoch - 1) * self.pad_len
+            self.epoch = self.epoch[:num_elements]
+            self.iter = self.iter[:num_elements]
+            self.loss = self.loss[:num_elements]
+            self.train_acc = self.train_acc[:num_elements]
+            self.lr = self.lr[:num_elements] 
