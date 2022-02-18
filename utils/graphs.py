@@ -9,6 +9,8 @@ from torch import Tensor
 import parse
 import re
 
+def trim(vector, pad_len):
+        return vector[::pad_len]
 class TrainStat():
     def __init__(self) -> None:
         self.epoch = []
@@ -20,7 +22,7 @@ class TrainStat():
         self.cmc_r1 = []
         self.cmc_r5 = []
         self.cmc_r10 = []
-    
+
     def add(self, epoch, n_iter, loss, train_acc, lr):
         self.epoch.append(epoch)
         if len(self.iter) == 0:
@@ -34,18 +36,18 @@ class TrainStat():
         self.lr.append(lr)
     
     def add_valid(self, mAP, cmc_r1, cmc_r5, cmc_r10):        
-        padding = [np.NaN for i in range(self.pad_len - 1)]
+        # padding = [np.NaN for i in range(self.pad_len - 1)]
         
-        self.map = self.map + padding
+        # self.map = self.map + padding
         self.map.append(mAP)
         
-        self.cmc_r1 = self.cmc_r1 + padding
+        # self.cmc_r1 = self.cmc_r1 + padding
         self.cmc_r1.append(cmc_r1)
         
-        self.cmc_r5 = self.cmc_r5 + padding
+        # self.cmc_r5 = self.cmc_r5 + padding
         self.cmc_r5.append(cmc_r5)
         
-        self.cmc_r10 = self.cmc_r10 + padding
+        # self.cmc_r10 = self.cmc_r10 + padding
         self.cmc_r10.append(cmc_r10)
 
     def pad(self, list_in: List[Any], n: int):
@@ -53,28 +55,34 @@ class TrainStat():
         list_in = list_in + padding
     
     def plot(self):
-        self.df = pd.DataFrame({'epoch': self.epoch,
-                                'n_iter': self.iter,
-                                'loss' : self.loss,
-                                'training accuracy' : self.train_acc,
-                                'learning rate' : self.lr,
+        self.df = pd.DataFrame({'epoch': trim(self.epoch, self.pad_len),
+                                'n_iter': trim(self.iter, self.pad_len),
+                                'loss' : trim(self.loss, self.pad_len),
+                                'training accuracy' : trim(self.train_acc, self.pad_len),
+                                'learning rate' : trim(self.lr, self.pad_len),
                                 'mean average precision': self.map,
                                 'CMC Rank-1': self.cmc_r1,
                                 'CMC Rank-5': self.cmc_r5,
                                 'CMC Rank-10': self.cmc_r10})
         cols = self.df.columns.tolist()
         cols.remove('n_iter')
+        cols.remove('epoch')
         self.fig = go.Figure()
         for col in cols:
-                self.fig.add_trace(go.Line(x=self.df['n_iter'], y=self.df[col], name=col, mode='lines+markers'))
-    
+                self.fig.add_trace(go.Scatter(x=self.df['n_iter'], y=self.df[col], name=col, mode='lines+markers'))
+        self.fig.update_layout(
+            title="Training Data",
+            xaxis_title="Number of Iterations",
+            yaxis_title="Value",
+            legend_title="Value"
+        )
     def show(self):
         self.fig.show() 
     
     def save(self, dir):
         dateObj = datetime.now()
-        timestamp = dateObj.strftime("%d-%b-%Y-%H-%M-%S")
-        filename = "train-stat_" + timestamp
+        self.timestamp = dateObj.strftime("%d-%b-%Y-%H-%M-%S")
+        filename = "train-stat_" + self.timestamp
         self.fig.write_html(os.path.join(dir, filename))  
 
     def set_pad_length(self, epoch_length, log_period=50):
@@ -99,10 +107,10 @@ class TrainStat():
                         self.set_pad_length(int(max_iter), self.log_period)
                 if 'Validation Results' in line:
                     p = re.compile(r'\d+\.\d+')
-                    mAP = float(p.findall(file.readline()).pop())
-                    cmc_r1 = float(p.findall(file.readline()).pop())
-                    cmc_r5 = float(p.findall(file.readline()).pop())
-                    cmc_r10 = float(p.findall(file.readline()).pop())
+                    mAP = float(p.findall(file.readline()).pop()) / 100.0
+                    cmc_r1 = float(p.findall(file.readline()).pop()) / 100.0
+                    cmc_r5 = float(p.findall(file.readline()).pop()) / 100.0
+                    cmc_r10 = float(p.findall(file.readline()).pop()) / 100.0
 
                     if any(elem is None for elem in [mAP, cmc_r1, cmc_r5, cmc_r10]):
                         self.epoch.pop() # remove incomplete epoch from list
