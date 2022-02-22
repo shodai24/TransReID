@@ -12,7 +12,7 @@ import re
 def trim(vector, pad_len):
         return vector[::pad_len]
 class TrainStat():
-    def __init__(self) -> None:
+    def __init__(self, output_dir) -> None:
         self.epoch = []
         self.iter = []
         self.loss = []
@@ -22,6 +22,9 @@ class TrainStat():
         self.cmc_r1 = []
         self.cmc_r5 = []
         self.cmc_r10 = []
+        self.val_acc = []
+        self.filepath = output_dir
+        self.filename = ""
 
     def add(self, epoch, n_iter, loss, train_acc, lr):
         self.epoch.append(epoch)
@@ -35,20 +38,16 @@ class TrainStat():
         self.train_acc.append(train_acc)
         self.lr.append(lr)
     
-    def add_valid(self, mAP, cmc_r1, cmc_r5, cmc_r10):        
-        # padding = [np.NaN for i in range(self.pad_len - 1)]
-        
-        # self.map = self.map + padding
+    def add_valid(self, mAP, cmc_r1, cmc_r5, cmc_r10):                
         self.map.append(mAP)
-        
-        # self.cmc_r1 = self.cmc_r1 + padding
         self.cmc_r1.append(cmc_r1)
-        
-        # self.cmc_r5 = self.cmc_r5 + padding
         self.cmc_r5.append(cmc_r5)
-        
-        # self.cmc_r10 = self.cmc_r10 + padding
         self.cmc_r10.append(cmc_r10)
+        
+    def add_val_acc(self, val_acc):
+        if type(val_acc) is Tensor:
+            val_acc = Tensor.cpu(val_acc).item()
+        self.val_acc.append(val_acc)
 
     def pad(self, list_in: List[Any], n: int):
         padding = [np.NaN for i in range(self.pad_len)]
@@ -63,7 +62,8 @@ class TrainStat():
                                 'mean average precision': self.map,
                                 'CMC Rank-1': self.cmc_r1,
                                 'CMC Rank-5': self.cmc_r5,
-                                'CMC Rank-10': self.cmc_r10})
+                                'CMC Rank-10': self.cmc_r10,
+                                'Validation accuracy': self.val_acc})
         cols = self.df.columns.tolist()
         cols.remove('n_iter')
         cols.remove('epoch')
@@ -71,7 +71,7 @@ class TrainStat():
         for col in cols:
                 self.fig.add_trace(go.Scatter(x=self.df['n_iter'], y=self.df[col], name=col, mode='lines+markers'))
         self.fig.update_layout(
-            title="Training Data",
+            title="Training Data: " + self.filepath,
             xaxis_title="Number of Iterations",
             yaxis_title="Value",
             legend_title="Value"
@@ -80,16 +80,20 @@ class TrainStat():
         self.fig.show() 
     
     def save(self, dir):
-        dateObj = datetime.now()
-        self.timestamp = dateObj.strftime("%d-%b-%Y-%H-%M-%S")
-        filename = "train-stat_" + self.timestamp
-        self.fig.write_html(os.path.join(dir, filename))  
+        if self.filename:
+            fpath = os.path.join(dir, self.filename)
+            self.fig.write_html(fpath)
+        else:   
+            dateObj = datetime.now()
+            self.filename = "train-stat_" + dateObj.strftime("%d-%b-%Y-%H-%M-%S")
+            self.fig.write_html(os.path.join(dir, self.filename))  
 
     def set_pad_length(self, epoch_length, log_period=50):
         self.pad_len = (epoch_length // log_period)
     
     def load_train_log(self, filepath):
         # open train log
+        self.filepath = filepath
         with open(filepath, 'r') as file:
             no_pad_length_set = True
             for line in file:
@@ -116,7 +120,7 @@ class TrainStat():
                         self.epoch.pop() # remove incomplete epoch from list
                     else:
                         self.add_valid(mAP, cmc_r1, cmc_r5, cmc_r10)
-        # discard lines for incomplete epochs
+        # get one pont per epoch
         max_epoch = int(max(self.epoch))
         if len(self.epoch) != max_epoch * self.pad_len:
             num_elements = (max_epoch - 1) * self.pad_len

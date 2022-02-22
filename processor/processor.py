@@ -3,6 +3,7 @@ import os
 import time
 import torch
 import torch.nn as nn
+from model.backbones.swin_transformer import SwinTransformer
 from utils.meter import AverageMeter
 from utils.metrics import R1_mAP_eval
 from utils.graphs import TrainStat
@@ -37,7 +38,8 @@ def do_train(cfg,
 
     loss_meter = AverageMeter()
     acc_meter = AverageMeter()
-    statter = TrainStat()
+    val_meter = AverageMeter()
+    statter = TrainStat(cfg.OUTPUT_DIR)
 
     evaluator = R1_mAP_eval(num_query, max_rank=50, feat_norm=cfg.TEST.FEAT_NORM)
     scaler = amp.GradScaler()
@@ -46,6 +48,7 @@ def do_train(cfg,
         start_time = time.time()
         loss_meter.reset()
         acc_meter.reset()
+        val_meter.reset()
         evaluator.reset()
         scheduler.step(epoch)
         model.train()
@@ -111,12 +114,23 @@ def do_train(cfg,
             if cfg.MODEL.DIST_TRAIN:
                 if dist.get_rank() == 0:
                     model.eval()
+                    if isinstance(model.base, SwinTransformer):
+                        model.validate(True)
                     for n_iter, (img, vid, camid, camids, target_view, _) in enumerate(val_loader):
                         with torch.no_grad():
                             img = img.to(device)
                             camids = camids.to(device)
+                            target = vid.to(device)
                             target_view = target_view.to(device)
-                            feat = model(img, cam_label=camids, view_label=target_view)
+                            if isinstance(model.base, SwinTransformer):
+                                score, feat = model(img, cam_label=camids, view_label=target_view)
+                                if isinstance(score, list):
+                                    val_acc = (score[0].max(1)[1] == target).float().mean()
+                                else:
+                                    val_acc = (score.max(1)[1] == target).float().mean()
+                                val_meter.update(val_acc, 1)
+                            else:
+                                feat = model(img, cam_label=camids, view_label=target_view)
                             evaluator.update((feat, vid, camid))
                     cmc, mAP, _, _, _, _, _ = evaluator.compute()
                     logger.info("Validation Results - Epoch: {}".format(epoch))
@@ -124,17 +138,30 @@ def do_train(cfg,
                     for r in [1, 5, 10]:
                         logger.info("CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
                     statter.add_valid(mAP=mAP, cmc_r1=cmc[0], cmc_r5=cmc[4], cmc_r10=cmc[9])
+                    statter.add_val_acc(val_meter.avg)
                     statter.plot()
                     statter.save(cfg.OUTPUT_DIR)
+                    model.validate(False)
                     torch.cuda.empty_cache()
             else:
                 model.eval()
+                if isinstance(model.base, SwinTransformer):
+                        model.validate(True)
                 for n_iter, (img, vid, camid, camids, target_view, _) in enumerate(val_loader):
                     with torch.no_grad():
                         img = img.to(device)
                         camids = camids.to(device)
                         target_view = target_view.to(device)
                         feat = model(img, cam_label=camids, view_label=target_view)
+                        if isinstance(model.base, SwinTransformer):
+                                score, feat = model(img, cam_label=camids, view_label=target_view)
+                                if isinstance(score, list):
+                                    val_acc = (score[0].max(1)[1] == target).float().mean()
+                                else:
+                                    val_acc = (score.max(1)[1] == target).float().mean()
+                                val_meter.update(val_acc, 1)
+                        else:
+                            feat = model(img, cam_label=camids, view_label=target_view)
                         evaluator.update((feat, vid, camid))                      
                 cmc, mAP, _, _, _, _, _ = evaluator.compute()
                 logger.info("Validation Results - Epoch: {}".format(epoch))
@@ -142,8 +169,10 @@ def do_train(cfg,
                 for r in [1, 5, 10]:
                     logger.info("CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
                 statter.add_valid(mAP=mAP, cmc_r1=cmc[0], cmc_r5=cmc[4], cmc_r10=cmc[9])
+                statter.add_val_acc(val_meter.avg)
                 statter.plot()
                 statter.save(cfg.OUTPUT_DIR)
+                model.validate(False)
                 torch.cuda.empty_cache()
 
 

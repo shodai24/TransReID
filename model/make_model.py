@@ -60,6 +60,7 @@ class Backbone(nn.Module):
         self.cos_layer = cfg.MODEL.COS_LAYER
         self.neck = cfg.MODEL.NECK
         self.neck_feat = cfg.TEST.NECK_FEAT
+        self.validation = False
 
         if model_name == 'resnet50':
             self.in_planes = 2048
@@ -108,7 +109,7 @@ class Backbone(nn.Module):
         elif self.neck == 'bnneck':
             feat = self.bottleneck(global_feat)
 
-        if self.training:
+        if self.training or self.validation:
             if self.cos_layer:
                 cls_score = self.arcface(feat, label)
             else:
@@ -133,6 +134,9 @@ class Backbone(nn.Module):
         for i in param_dict:
             self.state_dict()[i].copy_(param_dict[i])
         print('Loading pretrained model for finetuning from {}'.format(model_path))
+    
+    def validate(self, value: bool):
+        self.validation = value
 
 class build_transformer(nn.Module):
     def __init__(self, num_classes, camera_num, view_num, cfg, factory):
