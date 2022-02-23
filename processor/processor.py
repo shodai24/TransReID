@@ -145,21 +145,22 @@ def do_train(cfg,
                     torch.cuda.empty_cache()
             else:
                 model.eval()
-                if isinstance(model.base, SwinTransformer):
-                        model.validate(True)
                 for n_iter, (img, vid, camid, camids, target_view, _) in enumerate(val_loader):
                     with torch.no_grad():
                         img = img.to(device)
                         camids = camids.to(device)
+                        target = torch.Tensor(vid).to(device)
                         target_view = target_view.to(device)
-                        feat = model(img, cam_label=camids, view_label=target_view)
+                        # feat = model(img, cam_label=camids, view_label=target_view)
                         if isinstance(model.base, SwinTransformer):
+                                model.validate(True)
                                 score, feat = model(img, cam_label=camids, view_label=target_view)
                                 if isinstance(score, list):
                                     val_acc = (score[0].max(1)[1] == target).float().mean()
                                 else:
                                     val_acc = (score.max(1)[1] == target).float().mean()
                                 val_meter.update(val_acc, 1)
+                                model.validate(False)
                         else:
                             feat = model(img, cam_label=camids, view_label=target_view)
                         evaluator.update((feat, vid, camid))                      
@@ -172,7 +173,7 @@ def do_train(cfg,
                 statter.add_val_acc(val_meter.avg)
                 statter.plot()
                 statter.save(cfg.OUTPUT_DIR)
-                model.validate(False)
+                
                 torch.cuda.empty_cache()
 
 
