@@ -22,7 +22,12 @@ class TrainStat():
         self.cmc_r1 = []
         self.cmc_r5 = []
         self.cmc_r10 = []
-        self.val_acc = []
+        
+        self.train_map = []
+        self.train_cmc_r1 = []
+        self.train_cmc_r5 = []
+        self.train_cmc_r10 = []
+        
         self.filepath = output_dir
         self.filename = ""
 
@@ -38,16 +43,18 @@ class TrainStat():
         self.train_acc.append(train_acc)
         self.lr.append(lr)
     
-    def add_valid(self, mAP, cmc_r1, cmc_r5, cmc_r10):                
+    def add_eval(self, mAP, cmc_r1, cmc_r5, cmc_r10):                
         self.map.append(mAP)
         self.cmc_r1.append(cmc_r1)
         self.cmc_r5.append(cmc_r5)
         self.cmc_r10.append(cmc_r10)
+    
+    def add_valid(self, mAP, cmc_r1, cmc_r5, cmc_r10):                
+        self.train_map.append(mAP)
+        self.train_cmc_r1.append(cmc_r1)
+        self.train_cmc_r5.append(cmc_r5)
+        self.train_cmc_r10.append(cmc_r10)
         
-    def add_val_acc(self, val_acc):
-        if type(val_acc) is Tensor:
-            val_acc = Tensor.cpu(val_acc).item()
-        self.val_acc.append(val_acc)
 
     def pad(self, list_in: List[Any], n: int):
         padding = [np.NaN for i in range(self.pad_len)]
@@ -63,7 +70,10 @@ class TrainStat():
                                 'CMC Rank-1': self.cmc_r1,
                                 'CMC Rank-5': self.cmc_r5,
                                 'CMC Rank-10': self.cmc_r10,
-                                'Validation accuracy': self.val_acc})
+                                'mAP (Train)': self.train_map,
+                                'Train CMC Rank-1': self.train_cmc_r1,
+                                'Train CMC Rank-5': self.train_cmc_r5,
+                                'Train CMC Rank-10': self.train_cmc_r10})
         cols = self.df.columns.tolist()
         cols.remove('n_iter')
         cols.remove('epoch')

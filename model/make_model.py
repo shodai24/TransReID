@@ -219,7 +219,7 @@ class build_transformer(nn.Module):
     def forward(self, x, label=None, cam_label= None, view_label=None):
         global_feat = self.base(x, cam_label=cam_label, view_label=view_label)
 
-        # feat = self.bottleneck(global_feat) #! skip batch normalization
+        feat = self.bottleneck(global_feat)
         feat = global_feat
 
         if self.training:
