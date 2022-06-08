@@ -138,8 +138,11 @@ def do_train(cfg,
                     for r in [1, 5, 10]:
                         logger.info("CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
                     statter.add_eval(mAP=mAP, cmc_r1=cmc[0], cmc_r5=cmc[4], cmc_r10=cmc[9])
-                    statter.plot()
-                    statter.save(cfg.OUTPUT_DIR)
+                    try:
+                        statter.plot()
+                        statter.save(cfg.OUTPUT_DIR)
+                    except:
+                        pass
                     model.validate(False)
                     torch.cuda.empty_cache()
             else:
@@ -173,9 +176,11 @@ def do_train(cfg,
                 for r in [1, 5, 10]:
                     logger.info("CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
                 statter.add_eval(mAP=mAP, cmc_r1=cmc[0], cmc_r5=cmc[4], cmc_r10=cmc[9])
-                statter.plot()
-                statter.save(cfg.OUTPUT_DIR)
-                
+                try:
+                    statter.plot()
+                    statter.save(cfg.OUTPUT_DIR)
+                except:
+                    pass
                 torch.cuda.empty_cache()
 
 
