@@ -61,7 +61,7 @@ class TrainStat():
         list_in = list_in + padding
     
     def plot(self):
-        self.df = pd.DataFrame({'epoch': trim(self.epoch, self.pad_len),
+        metrics = {'epoch': trim(self.epoch, self.pad_len),
                                 'n_iter': trim(self.iter, self.pad_len),
                                 'loss' : trim(self.loss, self.pad_len),
                                 'training accuracy' : trim(self.train_acc, self.pad_len),
@@ -73,7 +73,14 @@ class TrainStat():
                                 'mAP (Train)': self.train_map,
                                 'Train CMC Rank-1': self.train_cmc_r1,
                                 'Train CMC Rank-5': self.train_cmc_r5,
-                                'Train CMC Rank-10': self.train_cmc_r10})
+                                'Train CMC Rank-10': self.train_cmc_r10}
+        
+        # discard empty or incomplete columns (< max_epochs data points) for graphs
+        empty_keys = [k for k,v in metrics.items() if not v or len(v) < max(metrics['epoch'])]
+        for k in empty_keys:
+            del metrics[k]
+        
+        self.df = pd.DataFrame(metrics)
         cols = self.df.columns.tolist()
         cols.remove('n_iter')
         cols.remove('epoch')
@@ -129,7 +136,10 @@ class TrainStat():
                     if any(elem is None for elem in [mAP, cmc_r1, cmc_r5, cmc_r10]):
                         self.epoch.pop() # remove incomplete epoch from list
                     else:
-                        self.add_valid(mAP, cmc_r1, cmc_r5, cmc_r10)
+                        if '(Train)' in line:
+                            self.add_valid(mAP, cmc_r1, cmc_r5, cmc_r10)
+                        else:
+                            self.add_eval(mAP, cmc_r1, cmc_r5, cmc_r10)
         # get one pont per epoch
         max_epoch = int(max(self.epoch))
         if len(self.epoch) != max_epoch * self.pad_len:
