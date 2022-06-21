@@ -3,8 +3,10 @@ import os
 import time
 import torch
 import torch.nn as nn
+from model.backbones.swin_transformer import SwinTransformer
 from utils.meter import AverageMeter
 from utils.metrics import R1_mAP_eval
+from utils.graphs import TrainStat
 from torch.cuda import amp
 import torch.distributed as dist
 
@@ -13,11 +15,13 @@ def do_train(cfg,
              center_criterion,
              train_loader,
              val_loader,
+             train_val_loader,
              optimizer,
              optimizer_center,
              scheduler,
              loss_fn,
-             num_query, local_rank):
+             num_query, local_rank,
+             num_train_query):
     log_period = cfg.SOLVER.LOG_PERIOD
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
     eval_period = cfg.SOLVER.EVAL_PERIOD
@@ -36,15 +40,20 @@ def do_train(cfg,
 
     loss_meter = AverageMeter()
     acc_meter = AverageMeter()
+    val_meter = AverageMeter()
+    statter = TrainStat(cfg.OUTPUT_DIR)
 
     evaluator = R1_mAP_eval(num_query, max_rank=50, feat_norm=cfg.TEST.FEAT_NORM)
+    validator = R1_mAP_eval(num_train_query, max_rank=50, feat_norm=cfg.TEST.FEAT_NORM)
     scaler = amp.GradScaler()
     # train
     for epoch in range(1, epochs + 1):
         start_time = time.time()
         loss_meter.reset()
         acc_meter.reset()
+        val_meter.reset()
         evaluator.reset()
+        validator.reset()
         scheduler.step(epoch)
         model.train()
         for n_iter, (img, vid, target_cam, target_view) in enumerate(train_loader):
@@ -81,6 +90,7 @@ def do_train(cfg,
                 logger.info("Epoch[{}] Iteration[{}/{}] Loss: {:.3f}, Acc: {:.3f}, Base Lr: {:.2e}"
                             .format(epoch, (n_iter + 1), len(train_loader),
                                     loss_meter.avg, acc_meter.avg, scheduler._get_lr(epoch)[0]))
+                statter.add(epoch, n_iter + 1, loss_meter.avg, acc_meter.avg, scheduler._get_lr(epoch)[0])
 
         end_time = time.time()
         time_per_batch = (end_time - start_time) / (n_iter + 1)
@@ -118,6 +128,20 @@ def do_train(cfg,
                     torch.cuda.empty_cache()
             else:
                 model.eval()
+                for n_iter, (img, vid, camid, camids, target_view, _) in enumerate(train_val_loader):
+                    with torch.no_grad():
+                        img = img.to(device)
+                        camids = camids.to(device)
+                        target_view = target_view.to(device)
+                        feat = model(img, cam_label=camids, view_label=target_view)
+                        validator.update((feat, vid, camid))
+                train_cmc, train_mAP, _, _, _, _, _ = validator.compute()
+                logger.info("Validation Results (Train) - Epoch: {}".format(epoch))
+                logger.info("train_mAP: {:.1%}".format(train_mAP))
+                for r in [1, 5, 10]:
+                    logger.info("Train_CMC curve, Rank-{:<3}:{:.1%}".format(r, train_cmc[r - 1]))
+                statter.add_valid(mAP=train_mAP, cmc_r1=train_cmc[0], cmc_r5=train_cmc[4], cmc_r10=train_cmc[9])
+                
                 for n_iter, (img, vid, camid, camids, target_view, _) in enumerate(val_loader):
                     with torch.no_grad():
                         img = img.to(device)
@@ -130,6 +154,12 @@ def do_train(cfg,
                 logger.info("mAP: {:.1%}".format(mAP))
                 for r in [1, 5, 10]:
                     logger.info("CMC curve, Rank-{:<3}:{:.1%}".format(r, cmc[r - 1]))
+                statter.add_eval(mAP=mAP, cmc_r1=cmc[0], cmc_r5=cmc[4], cmc_r10=cmc[9])
+                try:
+                    statter.plot()
+                    statter.save(cfg.OUTPUT_DIR)
+                except:
+                    pass
                 torch.cuda.empty_cache()
 
 

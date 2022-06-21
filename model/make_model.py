@@ -448,7 +448,7 @@ def make_model(cfg, num_class, camera_num, view_num):
     elif cfg.MODEL.NAME == 'swin':
         if cfg.MODEL.SIE_CAMERA:
             model = build_transformer(num_class, camera_num, view_num, cfg, __factory_T_type)
-            print('===========building transformer===========')
+            print('===========building Swin with SIE===========')
         else:
             model = Backbone(num_class, cfg)
             print('===========building Swin===========')

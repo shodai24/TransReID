@@ -1,6 +1,7 @@
 import torch
 import torchvision.transforms as T
 from torch.utils.data import DataLoader
+import numpy as np
 
 from .bases import ImageDataset
 from timm.data.random_erasing import RandomErasing
@@ -59,7 +60,18 @@ def make_dataloader(cfg):
     num_workers = cfg.DATALOADER.NUM_WORKERS
 
     dataset = __factory[cfg.DATASETS.NAMES](root=cfg.DATASETS.ROOT_DIR)
-
+    
+     ### Split train set into train_query, train_gallery for train metrics
+    train_query = []
+    train_gallery = []
+    ratio =  len(dataset.query) / len(dataset.gallery)
+    for i in range(dataset.num_train_pids):
+        collect_i = [t for t in dataset.train if t[1] == i]
+        idx = int(np.ceil(ratio * len(collect_i)))
+        train_query.extend(collect_i[:idx])
+        train_gallery.extend(collect_i[idx:])
+           
+    train_val_set = ImageDataset(train_query + train_gallery, val_transforms)
     train_set = ImageDataset(dataset.train, train_transforms)
     train_set_normal = ImageDataset(dataset.train, val_transforms)
     num_classes = dataset.num_train_pids
@@ -95,6 +107,11 @@ def make_dataloader(cfg):
         print('unsupported sampler! expected softmax or triplet but got {}'.format(cfg.SAMPLER))
 
     val_set = ImageDataset(dataset.query + dataset.gallery, val_transforms)
+    
+    train_val_loader = DataLoader(
+        train_val_set, batch_size=cfg.TEST.IMS_PER_BATCH, shuffle=False, num_workers=num_workers,
+        collate_fn=val_collate_fn
+    )
 
     val_loader = DataLoader(
         val_set, batch_size=cfg.TEST.IMS_PER_BATCH, shuffle=False, num_workers=num_workers,
@@ -104,4 +121,4 @@ def make_dataloader(cfg):
         train_set_normal, batch_size=cfg.TEST.IMS_PER_BATCH, shuffle=False, num_workers=num_workers,
         collate_fn=val_collate_fn
     )
-    return train_loader, train_loader_normal, val_loader, len(dataset.query), num_classes, cam_num, view_num
+    return train_loader, train_loader_normal, val_loader, len(dataset.query), num_classes, cam_num, view_num, train_val_loader, len(train_query)
