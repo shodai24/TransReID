@@ -65,7 +65,7 @@ class TrainStat():
         list_in = list_in + padding
 
     def plot(self):
-        metrics = pd.DataFrame({'epoch': list(set(self.epoch)),
+        self.df = pd.DataFrame({'epoch': list(set(self.epoch)),
                     'n_iter': self.trim(self.iter),
                     'loss' : self.trim(self.loss),
                     'training accuracy' : self.trim(self.train_acc),
