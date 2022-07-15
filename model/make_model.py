@@ -143,10 +143,16 @@ class build_transformer(nn.Module):
             view_num = 0
 
         if cfg.MODEL.IS_SWIN:
-            self.in_planes = 128
-            self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE, camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH,
-            swin_embed_dim=128, swin_depths=[2,2,18,2], swin_num_heads=[4,8,16,32], swin_window_size=7, swin_drop_path_rate=0.5)
-            # TODO Pass arguments form CFG file into function
+            self.in_planes = cfg.MODEL.SWIN_EMBED_DIM * 8
+            self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE,
+                                                            camera=camera_num, view=view_num,
+                                                            stride_size=cfg.MODEL.STRIDE_SIZE,
+                                                            drop_path_rate=cfg.MODEL.DROP_PATH,
+                                                            swin_embed_dim=cfg.MODEL.SWIN_EMBED_DIM,
+                                                            swin_depths=cfg.MODEL.SWIN_DEPTHS,
+                                                            swin_num_heads=cfg.MODEL.SWIN_NUM_HEADS,
+                                                            swin_window_size=cfg.MODEL.SWIN_WINDOW_SIZE,
+                                                            swin_drop_path_rate=cfg.MODEL.SWIN_DROP_PATH_RATE)
         else:
             self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE,
                                                             camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH,
@@ -182,10 +188,10 @@ class build_transformer(nn.Module):
             self.classifier = CircleLoss(self.in_planes, self.num_classes,
                                         s=cfg.SOLVER.COSINE_SCALE, m=cfg.SOLVER.COSINE_MARGIN)
         else:
-            self.classifier = nn.Linear(1024, self.num_classes, bias=False) #! self.in_planes = 1024
+            self.classifier = nn.Linear(self.in_planes, self.num_classes, bias=False)
             self.classifier.apply(weights_init_classifier)
 
-        self.bottleneck = nn.BatchNorm1d(1024) #! self.in_planes = 1024
+        self.bottleneck = nn.BatchNorm1d(self.in_planes)
         self.bottleneck.bias.requires_grad_(False)
         self.bottleneck.apply(weights_init_kaiming)
 
@@ -244,12 +250,7 @@ class build_transformer_local(nn.Module):
         else:
             view_num = 0
 
-        if cfg.MODEL.IS_SWIN:
-            self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE, local_feature=cfg.MODEL.JPM, camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH,
-            swin_embed_dim=128, swin_depths=[2,2,18,2], swin_num_heads=[4,8,16,32], swin_window_size=7, swin_drop_path_rate=0.5)
-            # TODO Pass arguments form CFG file into function
-        else:
-            self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE, local_feature=cfg.MODEL.JPM, camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH)
+        self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE, local_feature=cfg.MODEL.JPM, camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH)
 
         if pretrain_choice == 'imagenet':
             if self.base.swin_model is not None:
@@ -258,12 +259,8 @@ class build_transformer_local(nn.Module):
                 self.base.load_param(model_path)
             print('Loading pretrained ImageNet model......from {}'.format(model_path))
 
-        if self.base.swin_model is not None:
-            block = self.base.swin_model.layers[-1] # swin
-            layer_norm = self.base.swin_model.norm
-        else: 
-            block = self.base.blocks[-1]
-            layer_norm = self.base.norm
+        block = self.base.blocks[-1]
+        layer_norm = self.base.norm
         self.b1 = nn.Sequential(
             copy.deepcopy(block),
             copy.deepcopy(layer_norm)
