@@ -47,7 +47,7 @@ SOLVER:
   LARGE_FC_LR: False
   CHECKPOINT_PERIOD: 120
   LOG_PERIOD: 50
-  EVAL_PERIOD: 120
+  EVAL_PERIOD: 1
   WEIGHT_DECAY:  1e-4
   WEIGHT_DECAY_BIAS: 1e-4
   BIAS_LR_FACTOR: 2
@@ -60,6 +60,6 @@ TEST:
   NECK_FEAT: 'before'
   FEAT_NORM: 'yes'
 
-OUTPUT_DIR: '../logs/market_swin_transreid_sie/180122'
+OUTPUT_DIR: '../logs/market_swin_transreid_sie/150722'
 
 

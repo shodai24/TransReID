@@ -158,7 +158,7 @@ class build_transformer(nn.Module):
             view_num = 0
 
         if cfg.MODEL.IS_SWIN:
-            self.in_planes = 1024
+            self.in_planes = cfg.MODEL.SWIN_EMBED_DIM * 8
             self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](
                 img_size=cfg.INPUT.SIZE_TRAIN,
                 sie_xishu=cfg.MODEL.SIE_COE,
