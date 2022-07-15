@@ -69,15 +69,15 @@ class Backbone(nn.Module):
                                layers=[3, 4, 6, 3])
             print('using resnet50 as a backbone')
         elif model_name == 'swin':
-            self.in_planes = 1024
+            self.in_planes = cfg.MODEL.SWIN_EMBED_DIM * 8
             self.base = SwinTransformer(
-                img_size=224,
+                img_size=cfg.INPUT.SIZE_TRAIN,
                 patch_size=4,
-                embed_dim=128,
-                depths=[2, 2, 18, 2],
-                num_heads=[4, 8, 16, 32],
-                window_size=7,
-                drop_path_rate=0.5
+                embed_dim=cfg.MODEL.SWIN_EMBED_DIM,
+                depths=cfg.MODEL.SWIN_DEPTHS,
+                num_heads=cfg.MODEL.SWIN_NUM_HEADS,
+                window_size=cfg.MODEL.SWIN_WINDOW_SIZE,
+                drop_path_rate=cfg.MODEL.SWIN_DROP_PATH_RATE
             )
             print('using Swin as a backbone')
         else:
