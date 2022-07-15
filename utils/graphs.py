@@ -1,7 +1,6 @@
 from typing import Any, List
 import pandas as pd
 import plotly
-import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime
@@ -9,7 +8,6 @@ import os
 from torch import Tensor
 import parse
 import re
-import matplotlib.pyplot as plt
 
 class TrainStat():
     def __init__(self, output_dir) -> None:
