@@ -1,6 +1,8 @@
 ![Python >=3.5](https://img.shields.io/badge/Python->=3.5-yellow.svg)
 ![PyTorch >=1.0](https://img.shields.io/badge/PyTorch->=1.6-blue.svg)
 
+This is a *copy* of the official TransReID repository which tries to implement a TransReID with the [Swin Transformer](https://github.com/microsoft/Swin-Transformer). A YML file for running training and testing code for this branch can be found at `configs/Market/swin_transreid_sie.yml` for Market-1501 and `configs/VeRi/swin_transreid_sie.yml`.
+
 # [ICCV2021] TransReID: Transformer-based Object Re-Identification [[pdf]](https://openaccess.thecvf.com/content/ICCV2021/papers/He_TransReID_Transformer-Based_Object_Re-Identification_ICCV_2021_paper.pdf)
 
 The *official* repository for  [TransReID: Transformer-based Object Re-Identification](https://arxiv.org/abs/2102.04378) achieves state-of-the-art performances on object re-ID, including person re-ID and vehicle re-ID.
