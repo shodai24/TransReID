@@ -26,7 +26,7 @@ INPUT:
   PIXEL_STD: [0.5, 0.5, 0.5]
 
 DATASETS:
-  NAMES: ('market1501')
+  NAMES: ('veri')
   ROOT_DIR: ('../data')
 
 DATALOADER:
